@@ -1,0 +1,52 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "util.h"
+
+EXEC SQL INCLUDE SQLCA;
+
+int main(int argc, char *argv[]) {
+   int i;
+   char pubidstr[10];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+      char db[6] = "cs348";
+      int pubid;
+      char title[30];
+   EXEC SQL END DECLARE SECTION;
+
+   printf("Sample C program: SAMPLE2\n" );
+
+   EXEC SQL CONNECT TO :db;
+
+   printf("Connected to DB2\n");
+
+   EXEC SQL WHENEVER SQLERROR  GO TO error;
+
+   for (i=1; i<argc; i++) {
+     strncpy(pubidstr, argv[i], 8);
+     pubid = atoi(pubidstr);
+     
+     EXEC SQL WHENEVER NOT FOUND GO TO nope;
+     EXEC SQL SELECT title INTO :title
+              FROM   publication
+              WHERE  pubid = :pubid;
+     
+     printf("%d: %s\n",pubid,title);
+     continue;
+   nope:
+     printf("%d: *** not found *** \n",pubid);
+   };
+
+   EXEC SQL COMMIT;
+   EXEC SQL CONNECT reset;
+   exit(0);
+
+error:
+   check_error("My error",&sqlca);
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+
+   EXEC SQL ROLLBACK;
+   EXEC SQL CONNECT reset;
+   exit(1);
+}
