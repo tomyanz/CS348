@@ -1,0 +1,132 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "util.h"
+
+EXEC SQL INCLUDE SQLCA; 
+
+EXEC SQL BEGIN DECLARE SECTION;
+   char db[6] = "cs348";
+   char title[25], name[10], apat[10], publisher[25];
+   int pubid, year, number, volume, appears_in, startpage, endpage;
+   short aid;
+EXEC SQL END DECLARE SECTION;
+
+int main(int argc, char *argv[]) {
+   if (argc!=2) {
+      printf("Usage: sample3 <pattern>\n");
+      exit(1);
+   };
+   printf("Sample C program: SAMPLE3\n" );
+
+   EXEC SQL WHENEVER SQLERROR  GO TO error;
+
+   EXEC SQL CONNECT TO :db;
+
+   printf("Connected to DB2\n");
+   strncpy(apat,argv[1],8);
+     
+   EXEC SQL DECLARE books CURSOR FOR 
+      SELECT name, title, publication.pubid, publisher, year
+      FROM author, wrote, publication, book
+      WHERE name=:apat
+      AND aid=author
+      AND publication = publication.pubid
+      AND publication = book.pubid;
+
+   EXEC SQL DECLARE journals CURSOR FOR 
+      SELECT title, publication.pubid, volume, number, year
+      FROM author, wrote, publication, journal 
+      WHERE name=:apat
+      AND aid=author
+      AND publication = publication.pubid
+      AND publication = journal.pubid;
+
+   EXEC SQL DECLARE proceedings CURSOR FOR 
+      SELECT title, publication.pubid, year
+      FROM author, wrote, publication, proceedings
+      WHERE name=:apat
+      AND aid=author
+      AND publication = publication.pubid
+      AND publication = proceedings.pubid;
+
+   EXEC SQL DECLARE articles CURSOR FOR 
+      SELECT name, title, publication.pubid, appears_in, startpage, endpage 
+      FROM author, wrote, publication, article
+      WHERE name=:apat
+      AND aid=author
+      AND publication = publication.pubid
+      AND publication = article.pubid;
+
+   EXEC SQL OPEN books;
+   EXEC SQL WHENEVER NOT FOUND GO TO one;
+
+   for (;;) {
+     EXEC SQL FETCH books INTO :name, :title, :pubid, :publisher, :year;
+     printf("Pubid: %d\n", pubid);
+     printf("Type: BOOK\n");
+     printf("Title: %s\n", title);
+     printf("Authors: %s\n", name);
+     printf("Publisher: %s\n", publisher);
+     printf("Year: %d\n", year);
+   };
+
+one:
+   EXEC SQL CLOSE books;
+   EXEC SQL OPEN journals;
+   EXEC SQL WHENEVER NOT FOUND GO TO two;
+
+   for (;;) {
+     EXEC SQL FETCH journals INTO :title, :pubid, :volume, :number, :year;
+     printf("Pubid: %d\n", pubid);
+     printf("Type: JOURNAL\n");
+     printf("Title: %s\n", title);
+     printf("Volume: %d\n", volume);
+     printf("Number: %d\n", number);
+     printf("Year: %d\n", year);
+   };
+
+two:
+   EXEC SQL CLOSE journals;
+   EXEC SQL OPEN proceedings;
+   EXEC SQL WHENEVER NOT FOUND GO TO three;
+
+   for (;;) {
+     EXEC SQL FETCH proceedings INTO :title, :pubid, :year;
+     printf("Pubid: %d\n", pubid);
+     printf("Type: PROCEEDINGS\n");
+     printf("Title: %s\n", title);
+     printf("Year: %d\n", year);
+   };
+
+three:
+   EXEC SQL CLOSE proceedings;
+   EXEC SQL OPEN articles;
+   EXEC SQL WHENEVER NOT FOUND GO TO end;
+
+   for (;;) {
+     EXEC SQL FETCH articles INTO :name, :title, :pubid, :appears_in, :startpage, :endpage;
+     printf("Pubid: %d\n", pubid);
+     printf("Type: ARTICLE\n");
+     printf("Title: %s\n", title);
+     printf("Authors: %s\n", name);
+     printf("In: %d\n", appears_in);
+     printf("Pages: %d--%d\n", startpage, endpage);
+   };
+
+end: 
+   EXEC SQL CLOSE articles;
+   EXEC SQL COMMIT;
+   EXEC SQL CONNECT RESET;
+
+   exit(0);
+
+error:
+   check_error("My error",&sqlca);
+
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   EXEC SQL ROLLBACK;
+   EXEC SQL CONNECT reset;
+
+   exit(1);
+}

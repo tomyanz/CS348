@@ -1,0 +1,66 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "util.h"
+
+EXEC SQL INCLUDE SQLCA; 
+
+EXEC SQL BEGIN DECLARE SECTION;
+   char db[6] = "cs348";
+   char title[25], name[10], apat[10];
+   int pubid, appears_in, startpage, endpage;
+   short aid;
+EXEC SQL END DECLARE SECTION;
+
+int main(int argc, char *argv[]) {
+   if (argc!=2) {
+      printf("Usage: sample3 <pattern>\n");
+      exit(1);
+   };
+   printf("Sample C program: SAMPLE3\n" );
+
+   EXEC SQL WHENEVER SQLERROR  GO TO error;
+
+   EXEC SQL CONNECT TO :db;
+
+   printf("Connected to DB2\n");
+   strncpy(apat,argv[1],8);
+     
+   EXEC SQL DECLARE articles CURSOR FOR 
+      SELECT name, title, publication.pubid, appears_in, startpage, endpage
+      FROM author, wrote, publication, article
+      WHERE appears_in = CAST(:apat as INT)
+      AND aid=author
+      AND publication = publication.pubid
+      AND publication = article.pubid
+      ORDER BY startpage;
+
+   EXEC SQL OPEN articles;
+   EXEC SQL WHENEVER NOT FOUND GO TO end;
+
+   for (;;) {
+     EXEC SQL FETCH articles INTO :name, :title, :pubid, :appears_in, :startpage, :endpage;
+     printf("Pubid: %d\n", pubid);
+     printf("Type: ARTICLE\n");
+     printf("Title: %s\n", title);
+     printf("Authors:\n");
+     printf("In: %d\n", appears_in);
+     printf("Pages: %d--%d\n", startpage, endpage);
+   };
+
+end:
+   EXEC SQL CLOSE articles;
+   EXEC SQL COMMIT;
+   EXEC SQL CONNECT RESET;
+
+   exit(0);
+
+error:
+   check_error("My error",&sqlca);
+
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   EXEC SQL ROLLBACK;
+   EXEC SQL CONNECT reset;
+
+   exit(1);
+}
